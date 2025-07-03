@@ -35,15 +35,15 @@
     "frontend",
     "web-development"
   ],
-  "author": "Your Name <your.email@example.com>",
+  "author": "Azula9713",
   "license": "MIT",
-  "homepage": "https://github.com/yourusername/yae-modernize-tailwind#readme",
+  "homepage": "https://github.com/Yae-Tools/yae-modernize-tailwind#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/yae-modernize-tailwind.git"
+    "url": "git+https://github.com/Yae-Tools/yae-modernize-tailwind.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/yae-modernize-tailwind/issues"
+    "url": "https://github.com/Yae-Tools/yae-modernize-tailwind/issues"
   },
   "dependencies": {
     "@types/node": "^24.0.10",
