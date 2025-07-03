@@ -13,10 +13,10 @@ A powerful and opinionated CLI tool designed to automate the migration of your T
 
 ## 🚀 Getting Started
 
-To use `yae-tailwind-migrate`, simply run it via `npx` in your project's root directory:
+To use `yae-modernize-tailwind`, simply run it via `npx` in your project's root directory:
 
 ```bash
-npx yae-tailwind-migrate [options]
+npx yae-modernize-tailwind [options]
 ```
 
 ### Prerequisites
@@ -31,7 +31,7 @@ npx yae-tailwind-migrate [options]
 If you run the tool without specifying conversions, it will enter an interactive mode, prompting you to select the conversions you want to apply:
 
 ```bash
-npx yae-tailwind-migrate
+npx yae-modernize-tailwind
 ```
 
 ### Specifying Conversions
@@ -39,13 +39,13 @@ npx yae-tailwind-migrate
 You can specify one or more conversions directly using the `-c` or `--conversions` flag:
 
 ```bash
-npx yae-tailwind-migrate -c size -c margin
+npx yae-modernize-tailwind -c size -c margin
 ```
 
 Or for multiple conversions:
 
 ```bash
-npx yae-tailwind-migrate -c size margin padding
+npx yae-modernize-tailwind -c size margin padding
 ```
 
 ### Targeting Specific Files or Directories
@@ -54,25 +54,25 @@ Use the `-p` or `--path` flag to specify which files or directories to process. 
 
 ```bash
 # Process all JS, JSX, TS, TSX, HTML, CSS, and Svelte files in the 'src' directory
-npx yae-tailwind-migrate -p "src/**/*.{js,jsx,ts,tsx,html,css,svelte}" -c size
+npx yae-modernize-tailwind -p "src/**/*.{js,jsx,ts,tsx,html,css,svelte}" -c size
 
 # Process only a specific file
-npx yae-tailwind-migrate -p "components/Button.tsx" -c color-opacity
+npx yae-modernize-tailwind -p "components/Button.tsx" -c color-opacity
 ```
 
 The default path is `./**/*.{js,jsx,ts,tsx,html,css,svelte}`, which covers common file types in the current directory.
 
 ### Ignoring Git Clean Check
 
-By default, `yae-tailwind-migrate` will prevent execution if your Git repository has uncommitted changes. To override this behavior, use the `--ignore-git` flag:
+By default, `yae-modernize-tailwind` will prevent execution if your Git repository has uncommitted changes. To override this behavior, use the `--ignore-git` flag:
 
 ```bash
-npx yae-tailwind-migrate --ignore-git -c gap
+npx yae-modernize-tailwind --ignore-git -c gap
 ```
 
 ## 🔄 Supported Conversions
 
-`yae-tailwind-migrate` currently supports the following class conversions:
+`yae-modernize-tailwind` currently supports the following class conversions:
 
 *   `size`: Migrates older `w-`, `h-` classes to newer, more consistent sizing conventions.
 *   `margin`: Converts margin classes (e.g., `m-`, `mx-`, `my-`, `mt-`, `mb-`, `ml-`, `mr-`) to their updated forms.
@@ -90,14 +90,14 @@ To ensure proper functionality and avoid unexpected issues, please note the foll
 
 ## 📦 Monorepo Support
 
-`yae-tailwind-migrate` is designed with monorepos in mind. You can easily target specific packages or your entire monorepo:
+`yae-modernize-tailwind` is designed with monorepos in mind. You can easily target specific packages or your entire monorepo:
 
 ```bash
 # Convert files in a specific package
-npx yae-tailwind-migrate -p "packages/my-ui-library/**/*.{js,jsx,ts,tsx}" -c size
+npx yae-modernize-tailwind -p "packages/my-ui-library/**/*.{js,jsx,ts,tsx}" -c size
 
 # Convert files across all packages in your monorepo
-npx yae-tailwind-migrate -p "packages/**/*.{js,jsx,ts,tsx,html,css,svelte}" -c margin padding
+npx yae-modernize-tailwind -p "packages/**/*.{js,jsx,ts,tsx,html,css,svelte}" -c margin padding
 ```
 
 ## 🤝 Contributing
