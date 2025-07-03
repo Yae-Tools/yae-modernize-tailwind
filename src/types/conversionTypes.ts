@@ -1,0 +1,1 @@
+export type ConversionResult = { newContent: string; changed: boolean };
