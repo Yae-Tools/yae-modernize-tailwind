@@ -5,7 +5,7 @@ import { glob } from 'glob';
 import inquirer from 'inquirer';
 import { CONVERSIONS } from './conversions.js';
 import { simpleGit } from 'simple-git';
-import { detectEnvironment } from './environment.js';
+import { detectEnvironment, getTailwindVersion, shouldShowTailwindWarning } from './environment.js';
 import { exitMessage } from './util/exitMessage.js';
 import chalk from 'chalk';
 import ora from 'ora';
@@ -38,34 +38,34 @@ async function run() {
    ╚██╔╝  ██╔══██║██╔══╝  ╚════╝██║╚██╔╝██║██║   ██║██║  ██║██╔══╝  ██╔══██╗██║╚██╗██║██║ ███╔╝  ██╔══╝  
     ██║   ██║  ██║███████╗      ██║ ╚═╝ ██║╚██████╔╝██████╔╝███████╗██║  ██║██║ ╚████║██║███████╗███████╗
     ╚═╝   ╚═╝  ╚═╝╚══════╝      ╚═╝     ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝╚══════╝╚══════╝
-                                     
-                                                  ......                
-                                              .-++++++++++-.            
-                                            .++++++++++++++=.       .. 
-                                            .-..  ..:+++++++++=:...:=:  
-                                            .        .:++++++++=====:   
-                                          ....         .:-=++====-:.    
-                                      .:-=+++++=-:.        .....        
-                                    :+++++++++++++:.        .          
-                                    :=-...:=+++++++++:..  ..-.          
-                                  ..       .=+++++++++=====.           
-                                              .-++++++++==-.            
-                                              .....::.....       
-
+             
+                                                  ██████       
+                                                  █████████   ██
+                                                █    █████████ 
+                                              █████    █████   
+                                            █████████    █     
+                                            ██   █████████      
+                                                  ██████       
+                  
                                       Tailwind CSS Class Converter
 `;
 
-  console.log(chalk.blue(logo));
-  console.log(
-    "\x1b[31m⚠️  Warning: For full compatibility, especially with 'size' conversions, ensure your project uses Tailwind CSS v3.4 or later.\x1b[0m",
-  );
-  console.log(''); // Add an empty line for spacing
-
+  console.log(chalk.cyan(logo));
+  
   let { conversions, path, ignoreGit, 'ignore-git': ignoreGitKebab } = await argv;
   ignoreGit = typeof ignoreGit !== 'undefined' ? ignoreGit : ignoreGitKebab;
 
   const currentDir = process.cwd();
   const detectedEnv = await detectEnvironment(currentDir);
+  
+  // Check Tailwind CSS version and show warning if needed
+  const tailwindVersion = await getTailwindVersion(currentDir);
+  if (shouldShowTailwindWarning(tailwindVersion)) {
+    console.log(
+      "\x1b[31m⚠️  Warning: For full compatibility, especially with 'size' conversions, ensure your project uses Tailwind CSS v3.4 or later.\x1b[0m",
+    );
+    console.log(''); // Add an empty line for spacing
+  }
 
   if (detectedEnv !== 'Unknown' && process.stdout.isTTY) {
     const confirmEnv = await inquirer.prompt([
@@ -162,10 +162,7 @@ async function run() {
       spinner.start(chalk.cyan('Processing next file...')); // Restart spinner for next file
     }
   }
-
-  // spinner.succeed(chalk.green('Conversion complete!'));
   console.log(chalk.blue('All specified conversions have been applied.'));
-  exitMessage();
   return;
 }
 

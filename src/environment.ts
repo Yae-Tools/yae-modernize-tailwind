@@ -58,3 +58,34 @@ export async function detectEnvironment(projectRoot: string): Promise<Environmen
 
     return 'Unknown';
 }
+
+export async function getTailwindVersion(projectRoot: string): Promise<string | null> {
+    const packageJson = await readPackageJson(projectRoot);
+    
+    if (packageJson) {
+        // Check dependencies first, then devDependencies
+        const dependencies = packageJson.dependencies || {};
+        const devDependencies = packageJson.devDependencies || {};
+        
+        return dependencies['tailwindcss'] || devDependencies['tailwindcss'] || null;
+    }
+    
+    return null;
+}
+
+export function shouldShowTailwindWarning(version: string | null): boolean {
+    if (!version) {
+        return true; // Show warning if Tailwind CSS is not found
+    }
+    
+    // Parse version string (e.g., "^3.4.0", "~3.3.0", "3.4.1", ">=3.4.0")
+    const versionMatch = version.match(/(\d+)\.(\d+)(?:\.(\d+))?/);
+    if (!versionMatch) {
+        return true; // Show warning if version format is unrecognizable
+    }
+    
+    const [, major, minor] = versionMatch.map(Number);
+    
+    // Show warning if version is below 3.4
+    return major < 3 || (major === 3 && minor < 4);
+}

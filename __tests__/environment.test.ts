@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { detectEnvironment } from '../src/environment';
+import { detectEnvironment, getTailwindVersion, shouldShowTailwindWarning } from '../src/environment';
 
 vi.mock('fs', () => ({
   promises: {
@@ -107,5 +107,103 @@ describe('detectEnvironment', () => {
     mockReadFile.mockResolvedValueOnce('invalid json');
     const env = await detectEnvironment('/test/project');
     expect(env).toBe('Unknown');
+  });
+});
+
+describe('getTailwindVersion', () => {
+  const mockAccess = vi.mocked(fs.access);
+  const mockReadFile = vi.mocked(fs.readFile);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAccess.mockResolvedValue(undefined);
+  });
+
+  it('should return tailwindcss version from dependencies', async () => {
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({
+      dependencies: { tailwindcss: '3.4.1' },
+      devDependencies: {}
+    }));
+    
+    const version = await getTailwindVersion('/test/project');
+    expect(version).toBe('3.4.1');
+  });
+
+  it('should return tailwindcss version from devDependencies', async () => {
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({
+      dependencies: {},
+      devDependencies: { tailwindcss: '^3.4.0' }
+    }));
+    
+    const version = await getTailwindVersion('/test/project');
+    expect(version).toBe('^3.4.0');
+  });
+
+  it('should prioritize dependencies over devDependencies', async () => {
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({
+      dependencies: { tailwindcss: '3.4.1' },
+      devDependencies: { tailwindcss: '3.3.0' }
+    }));
+    
+    const version = await getTailwindVersion('/test/project');
+    expect(version).toBe('3.4.1');
+  });
+
+  it('should return null when tailwindcss is not found', async () => {
+    mockReadFile.mockResolvedValueOnce(JSON.stringify({
+      dependencies: { react: '^18.0.0' },
+      devDependencies: { typescript: '^4.0.0' }
+    }));
+    
+    const version = await getTailwindVersion('/test/project');
+    expect(version).toBe(null);
+  });
+
+  it('should return null when package.json does not exist', async () => {
+    mockAccess.mockRejectedValueOnce(new Error('File not found'));
+    
+    const version = await getTailwindVersion('/test/project');
+    expect(version).toBe(null);
+  });
+
+  it('should return null when package.json is invalid', async () => {
+    mockReadFile.mockResolvedValueOnce('invalid json');
+    
+    const version = await getTailwindVersion('/test/project');
+    expect(version).toBe(null);
+  });
+});
+
+describe('shouldShowTailwindWarning', () => {
+  it('should return true when version is null', () => {
+    expect(shouldShowTailwindWarning(null)).toBe(true);
+  });
+
+  it('should return true when version is below 3.4', () => {
+    expect(shouldShowTailwindWarning('3.3.0')).toBe(true);
+    expect(shouldShowTailwindWarning('^3.3.5')).toBe(true);
+    expect(shouldShowTailwindWarning('~3.2.1')).toBe(true);
+    expect(shouldShowTailwindWarning('2.9.0')).toBe(true);
+  });
+
+  it('should return false when version is 3.4 or higher', () => {
+    expect(shouldShowTailwindWarning('3.4.0')).toBe(false);
+    expect(shouldShowTailwindWarning('^3.4.1')).toBe(false);
+    expect(shouldShowTailwindWarning('~3.5.0')).toBe(false);
+    expect(shouldShowTailwindWarning('4.0.0')).toBe(false);
+    expect(shouldShowTailwindWarning('>=3.4.0')).toBe(false);
+  });
+
+  it('should return true when version format is unrecognizable', () => {
+    expect(shouldShowTailwindWarning('invalid')).toBe(true);
+    expect(shouldShowTailwindWarning('latest')).toBe(true);
+    expect(shouldShowTailwindWarning('')).toBe(true);
+    expect(shouldShowTailwindWarning('beta')).toBe(true);
+  });
+
+  it('should handle versions without patch numbers', () => {
+    expect(shouldShowTailwindWarning('3.4')).toBe(false);
+    expect(shouldShowTailwindWarning('3.3')).toBe(true);
+    expect(shouldShowTailwindWarning('^3.4')).toBe(false);
   });
 });
