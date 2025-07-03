@@ -7,7 +7,7 @@ export default {
   output: {
     file: 'dist/index.js',
     format: 'es',
-    sourcemap: true,
+    sourcemap: false,
     banner: '#!/usr/bin/env node',
   },
   plugins: [

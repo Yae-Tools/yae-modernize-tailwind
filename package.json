@@ -1,6 +1,6 @@
 {
   "name": "yae-modernize-tailwind",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A powerful CLI tool to automate migration of Tailwind CSS classes to newer, more efficient conventions",
   "type": "module",
   "main": "dist/index.js",
@@ -8,7 +8,7 @@
     "yae-modernize-tailwind": "dist/index.js"
   },
   "files": [
-    "dist",
+    "dist/index.js",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
