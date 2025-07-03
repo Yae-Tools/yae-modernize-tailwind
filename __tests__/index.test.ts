@@ -25,9 +25,7 @@ vi.mock('simple-git');
 vi.mock('ora');
 vi.mock('../src/environment');
 vi.mock('../src/util/exitMessage', () => ({
-  exitMessage: vi.fn(() => {
-    throw new Error('process.exit was called');
-  }),
+  exitMessage: vi.fn(),
 }));
 vi.mock('chalk', () => {
   const mockChalk = (str: string) => str;
@@ -76,6 +74,7 @@ describe('CLI Tool', () => {
       start: vi.fn().mockReturnThis(),
       succeed: vi.fn().mockReturnThis(),
       fail: vi.fn().mockReturnThis(),
+      stop: vi.fn().mockReturnThis(),
       text: '',
     };
     mockOra.mockReturnValue(mockSpinner);
@@ -190,10 +189,7 @@ describe('CLI Tool', () => {
       });
       
       const run = await importRun();
-      
-      await expect(async () => {
-        await run();
-      }).rejects.toThrow('process.exit was called');
+      await run();
       
       expect(mockConsoleLog).toHaveBeenCalledWith('Operation cancelled by user.');
       expect(mockExitMessage).toHaveBeenCalled();
@@ -291,7 +287,7 @@ describe('CLI Tool', () => {
       const run = await importRun();
       await run();
       
-      expect(mockExitMessage).not.toHaveBeenCalled();
+      expect(mockExitMessage).toHaveBeenCalledTimes(2);
     });
 
     it('should exit when git repository is not clean and ignore-git is false', async () => {
@@ -309,13 +305,7 @@ describe('CLI Tool', () => {
       });
       
       const run = await importRun();
-      
-      try {
-        await run();
-      } catch (error) {
-        // Expected to throw due to process.exit mock
-        expect((error as Error).message).toBe('process.exit was called');
-      }
+      await run();
       
       expect(mockConsoleError).toHaveBeenCalledWith(
         'Error: Git repository is not clean. Please commit or stash your changes before running the converter, or use --ignore-git to override.'
@@ -340,7 +330,7 @@ describe('CLI Tool', () => {
       const run = await importRun();
       await run();
       
-      expect(mockExitMessage).not.toHaveBeenCalled();
+      expect(mockExitMessage).toHaveBeenCalledTimes(2);
     });
 
     it('should continue when git repository is not clean but ignore-git is true (kebab-case)', async () => {
@@ -360,7 +350,7 @@ describe('CLI Tool', () => {
       const run = await importRun();
       await run();
       
-      expect(mockExitMessage).not.toHaveBeenCalled();
+      expect(mockExitMessage).toHaveBeenCalledTimes(2);
     });
 
     it('should warn when not a git repository', async () => {
@@ -374,7 +364,7 @@ describe('CLI Tool', () => {
       expect(mockConsoleWarn).toHaveBeenCalledWith(
         'Warning: Not a Git repository or Git not installed. Skipping Git clean check.'
       );
-      expect(mockExitMessage).not.toHaveBeenCalled();
+      expect(mockExitMessage).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -422,10 +412,7 @@ describe('CLI Tool', () => {
       Object.defineProperty(process.stdout, 'isTTY', { value: false });
       
       const run = await importRun();
-      
-      await expect(async () => {
-        await run();
-      }).rejects.toThrow('process.exit was called');
+      await run();
       
       expect(mockConsoleLog).toHaveBeenCalledWith(
         'No conversions selected. Please specify conversions with the -c flag or run in an interactive terminal.'

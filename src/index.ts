@@ -135,7 +135,6 @@ async function run() {
   const files = await glob(path, { nodir: true, ignore: ['node_modules/**'] });
 
   const spinner = ora(chalk.cyan('Processing files...')).start();
-
   for (const file of files) {
     try {
       spinner.text = chalk.cyan(`Processing file: ${file}`);
@@ -154,7 +153,10 @@ async function run() {
       if (changed) {
         await fs.writeFile(file, content, 'utf-8');
         spinner.succeed(chalk.green(`Updated ${file}`));
-        spinner.start(chalk.cyan('Processing next file...')); // Restart spinner for next file
+        if(files.indexOf(file) < files.length - 1) {
+          spinner.start(chalk.cyan('Processing next file...', file)); // Restart spinner for next file
+        }
+
       }
     } catch (error) {
       console.error(error);
@@ -162,7 +164,10 @@ async function run() {
       spinner.start(chalk.cyan('Processing next file...')); // Restart spinner for next file
     }
   }
+  spinner.stop();
+  console.log('');
   console.log(chalk.blue('All specified conversions have been applied.'));
+  exitMessage();
   return;
 }
 
