@@ -149,7 +149,5 @@ const logo =`
 
 export { run };
 
-// Only run if this file is executed directly (not imported)
-if (import.meta.url === `file://${process.argv[1]}`) {
-  run().catch(console.error);
-}
+// Always run the CLI when this file is executed
+run().catch(console.error);

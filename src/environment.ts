@@ -35,27 +35,22 @@ export async function detectEnvironment(projectRoot: string): Promise<Environmen
 
     if (packageJson) {
         const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies };
-
-        // Check for React (general)
         if (dependencies['react']) {
             return 'React';
         }
-        // Check for Angular
         if (dependencies['@angular/core']) {
             return 'Angular';
         }
-        // Check for Svelte
         if (dependencies['svelte']) {
             return 'Svelte';
         }
-        // Check for Vue
         if (dependencies['vue']) {
             return 'Vue';
         }
     }
 
     // Default to HTML/CSS if no specific framework is detected but there are HTML/CSS files
-    // This is a very basic check and can be improved.
+    //TODO: This is a very basic check and can be improved.
     const htmlFiles = await fs.readdir(projectRoot).then(files => files.filter(file => file.endsWith('.html') || file.endsWith('.css')));
     if (htmlFiles.length > 0) {
         return 'HTML/CSS';
