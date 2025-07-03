@@ -1,22 +1,50 @@
 {
   "name": "yae-modernize-tailwind",
   "version": "1.0.0",
-  "description": "A CLI tool to migrate Tailwind CSS classes to newer conventions.",
+  "description": "A powerful CLI tool to automate migration of Tailwind CSS classes to newer, more efficient conventions",
   "type": "module",
+  "main": "dist/index.js",
   "bin": {
     "yae-modernize-tailwind": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "build": "rollup -c",
     "start": "node dist/index.js",
     "lint": "eslint 'src/**/*.ts' --fix",
     "format": "prettier 'src/**/*.ts' --write",
     "test": "vitest",
-    "coverage": "vitest --coverage"
+    "coverage": "vitest --coverage",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "tailwind",
+    "tailwindcss",
+    "css",
+    "migration",
+    "cli",
+    "modernize",
+    "refactor",
+    "utility-classes",
+    "automation",
+    "frontend",
+    "web-development"
+  ],
+  "author": "Your Name <your.email@example.com>",
   "license": "MIT",
+  "homepage": "https://github.com/yourusername/yae-modernize-tailwind#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/yae-modernize-tailwind.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/yae-modernize-tailwind/issues"
+  },
   "dependencies": {
     "@types/node": "^24.0.10",
     "chalk": "^5.4.1",

@@ -56,7 +56,7 @@ const logo =`
 `
 
   console.log(chalk.blue(logo));
-  console.log(chalk.bold.bgRedBright.yellow("Warning: For full compatibility, especially with 'size' conversions, ensure your project uses Tailwind CSS v3.4 or later."));
+  console.log("\x1b[31m⚠️  Warning: For full compatibility, especially with 'size' conversions, ensure your project uses Tailwind CSS v3.4 or later.\x1b[0m");
   console.log(""); // Add an empty line for spacing
 
   let { conversions, path, ignoreGit, 'ignore-git': ignoreGitKebab } = await argv;
