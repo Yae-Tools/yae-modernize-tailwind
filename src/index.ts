@@ -6,6 +6,7 @@ import inquirer from 'inquirer';
 import { CONVERSIONS } from './conversions.js';
 import { simpleGit } from 'simple-git';
 import { detectEnvironment } from './environment.js';
+import { exitMessage } from './util/exitMessage.js';
 import chalk from 'chalk';
 import ora from 'ora';
 
@@ -27,11 +28,10 @@ const argv = yargs(hideBin(process.argv))
     default: false,
     description: 'Ignore Git clean check',
   })
-  .help()
-  .argv;
+  .help().argv;
 
 async function run() {
-const logo =`
+  const logo = `
  ██╗   ██╗ █████╗ ███████╗      ███╗   ███╗ ██████╗ ██████╗ ███████╗██████╗ ███╗   ██╗██╗███████╗███████╗
  ╚██╗ ██╔╝██╔══██╗██╔════╝      ████╗ ████║██╔═══██╗██╔══██╗██╔════╝██╔══██╗████╗  ██║██║╚══███╔╝██╔════╝
   ╚████╔╝ ███████║█████╗  █████╗██╔████╔██║██║   ██║██║  ██║█████╗  ██████╔╝██╔██╗ ██║██║  ███╔╝ █████╗  
@@ -53,11 +53,13 @@ const logo =`
                                               .....::.....       
 
                                       Tailwind CSS Class Converter
-`
+`;
 
   console.log(chalk.blue(logo));
-  console.log("\x1b[31m⚠️  Warning: For full compatibility, especially with 'size' conversions, ensure your project uses Tailwind CSS v3.4 or later.\x1b[0m");
-  console.log(""); // Add an empty line for spacing
+  console.log(
+    "\x1b[31m⚠️  Warning: For full compatibility, especially with 'size' conversions, ensure your project uses Tailwind CSS v3.4 or later.\x1b[0m",
+  );
+  console.log(''); // Add an empty line for spacing
 
   let { conversions, path, ignoreGit, 'ignore-git': ignoreGitKebab } = await argv;
   ignoreGit = typeof ignoreGit !== 'undefined' ? ignoreGit : ignoreGitKebab;
@@ -76,7 +78,7 @@ const logo =`
     ]);
     if (!confirmEnv.continue) {
       console.log(chalk.red('Operation cancelled by user.'));
-      process.exit(0);
+      exitMessage();
     }
   }
 
@@ -84,11 +86,17 @@ const logo =`
   try {
     const status = await git.status();
     if (!status.isClean() && !ignoreGit) {
-      console.error(chalk.red('Error: Git repository is not clean. Please commit or stash your changes before running the converter, or use --ignore-git to override.'));
-      process.exit(1);
+      console.error(
+        chalk.red(
+          'Error: Git repository is not clean. Please commit or stash your changes before running the converter, or use --ignore-git to override.',
+        ),
+      );
+      exitMessage();
     }
   } catch (error) {
-    console.warn(chalk.yellow('Warning: Not a Git repository or Git not installed. Skipping Git clean check.'));
+    console.warn(
+      chalk.yellow('Warning: Not a Git repository or Git not installed. Skipping Git clean check.'),
+    );
   }
 
   if (!conversions || conversions.length === 0) {
@@ -103,13 +111,24 @@ const logo =`
       ]);
       conversions = answers.selectedConversions;
     } else {
-      console.log(chalk.yellow('No conversions selected. Please specify conversions with the -c flag or run in an interactive terminal.'));
+      console.log(
+        chalk.yellow(
+          'No conversions selected. Please specify conversions with the -c flag or run in an interactive terminal.',
+        ),
+      );
+      console.log(
+        chalk.yellow(
+          'Example: `npx yae-modernize-tailwind -c size,spacing,typography -p "./src/**/*.{js,jsx,ts,tsx,html,css,svelte}"`',
+        ),
+      );
+      exitMessage();
       return;
     }
   }
 
   if (!conversions || conversions.length === 0) {
     console.log(chalk.red('No conversions selected. Exiting.'));
+    exitMessage();
     return;
   }
 
@@ -144,7 +163,10 @@ const logo =`
     }
   }
 
-  spinner.succeed(chalk.green('Conversion complete!'));
+  // spinner.succeed(chalk.green('Conversion complete!'));
+  console.log(chalk.blue('All specified conversions have been applied.'));
+  exitMessage();
+  return;
 }
 
 export { run };
