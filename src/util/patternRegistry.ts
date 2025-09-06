@@ -91,7 +91,7 @@ const reconstructSvelte = (classes: string[], original: string): string => {
 /**
  * Reconstruct template literal
  */
-const reconstructTemplate = (classes: string[], original: string): string => {
+const reconstructTemplate = (classes: string[], _original: string): string => {
   return `\`class="${classes.join(' ')}"\``;
 };
 
@@ -260,7 +260,7 @@ export const extractAllClassMatches = (content: string, filePath: string): Class
       }
 
       // Check for overlapping ranges with existing matches
-      const overlappingMatch = matches.find(existing => {
+      const overlappingMatch = matches.find((existing) => {
         return (
           (startIndex >= existing.startIndex && startIndex < existing.endIndex) ||
           (endIndex > existing.startIndex && endIndex <= existing.endIndex) ||
@@ -272,7 +272,7 @@ export const extractAllClassMatches = (content: string, filePath: string): Class
         // Prefer more specific patterns (Vue/React specific over generic HTML)
         const currentSpecificity = getPatternSpecificity(matcher.framework);
         const existingSpecificity = getPatternSpecificity(overlappingMatch.matcher.framework);
-        
+
         if (currentSpecificity > existingSpecificity) {
           // Remove the less specific match and add the more specific one
           const existingIndex = matches.indexOf(overlappingMatch);
@@ -308,7 +308,8 @@ export const extractAllClassMatches = (content: string, filePath: string): Class
 function getPatternSpecificity(frameworks: string[]): number {
   // Higher numbers = more specific
   if (frameworks.includes('vue')) return 3;
-  if (frameworks.includes('react') || frameworks.includes('jsx') || frameworks.includes('tsx')) return 3;
+  if (frameworks.includes('react') || frameworks.includes('jsx') || frameworks.includes('tsx'))
+    return 3;
   if (frameworks.includes('angular')) return 2;
   if (frameworks.includes('svelte')) return 2;
   if (frameworks.includes('html')) return 1;

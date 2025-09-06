@@ -281,7 +281,7 @@ export class ErrorHandler {
   /**
    * Log error to report for analysis
    */
-  private static logToErrorReport(error: ConversionError): void {
+  private static logToErrorReport(_error: ConversionError): void {
     // In a real implementation, this could write to a file or send to monitoring
     // For now, we'll just track in memory
   }
@@ -347,7 +347,7 @@ export class ErrorHandler {
   static async safeFileOperation<T>(
     operation: () => Promise<T>,
     filePath: string,
-    context: string,
+    _context: string,
   ): Promise<T | null> {
     try {
       return await operation();

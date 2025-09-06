@@ -1,0 +1,161 @@
+name: PR Version Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['package.json']
+
+jobs:
+  validate-version:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install semver for validation
+        run: npm install --no-save semver
+      
+      - name: Validate Version Bump
+        run: |
+          # Get version from PR branch
+          PR_VERSION=$(node -p "require('./package.json').version")
+          
+          # Get version from main branch
+          git fetch origin main:main
+          git show main:package.json > main_package.json
+          MAIN_VERSION=$(node -p "require('./main_package.json').version")
+          rm -f main_package.json
+          
+          echo "🔍 Version Validation Report"
+          echo "Main branch version: $MAIN_VERSION"
+          echo "PR branch version: $PR_VERSION"
+          
+          # Check if version changed
+          if [ "$PR_VERSION" != "$MAIN_VERSION" ]; then
+            echo "✅ Manual version bump detected: $MAIN_VERSION → $PR_VERSION"
+            
+            # Validate semantic versioning using Node.js and semver
+            node -e "
+              const semver = require('semver');
+              const current = '$MAIN_VERSION';
+              const newVersion = '$PR_VERSION';
+              
+              console.log('Validating semantic versioning...');
+              
+              if (!semver.valid(newVersion)) {
+                console.error('❌ Invalid semantic version format: ' + newVersion);
+                process.exit(1);
+              }
+              
+              if (!semver.gt(newVersion, current)) {
+                console.error('❌ New version must be greater than current version');
+                console.error('   Current: ' + current);
+                console.error('   New: ' + newVersion);
+                process.exit(1);
+              }
+              
+              // Determine bump type
+              let bumpType = 'unknown';
+              if (semver.major(newVersion) > semver.major(current)) {
+                bumpType = 'major';
+              } else if (semver.minor(newVersion) > semver.minor(current)) {
+                bumpType = 'minor';
+              } else if (semver.patch(newVersion) > semver.patch(current)) {
+                bumpType = 'patch';
+              }
+              
+              console.log('✅ Version bump is valid (' + bumpType + ' release)');
+              console.log('📋 Version follows semantic versioning principles');
+              
+              // Provide recommendations based on bump type
+              if (bumpType === 'major') {
+                console.log('⚠️  Major version bump detected - ensure breaking changes are documented');
+              } else if (bumpType === 'minor') {
+                console.log('📈 Minor version bump detected - new features added');
+              } else if (bumpType === 'patch') {
+                console.log('🔧 Patch version bump detected - bug fixes or improvements');
+              }
+            "
+            
+            echo ""
+            echo "🎯 Summary:"
+            echo "   • Version change is valid and follows semantic versioning"
+            echo "   • Auto-bump will be skipped after merge"
+            echo "   • GitHub release will be created automatically"
+            echo "   • Package will be published to NPM"
+            
+          else
+            echo "ℹ️  No manual version change detected"
+            echo "📋 This is normal - auto-bump will occur after merge to main"
+            echo "   • Patch version will be incremented automatically"
+            echo "   • Example: $MAIN_VERSION → $(echo $MAIN_VERSION | awk -F. '{print $1"."$2"."($3+1)}')"
+          fi
+      
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Get version info
+            const prVersion = JSON.parse(fs.readFileSync('./package.json', 'utf8')).version;
+            
+            // Get main version
+            const { execSync } = require('child_process');
+            execSync('git fetch origin main:main');
+            execSync('git show main:package.json > main_package.json');
+            const mainVersion = JSON.parse(fs.readFileSync('./main_package.json', 'utf8')).version;
+            
+            let body;
+            if (prVersion !== mainVersion) {
+              body = `## 📦 Version Change Detected
+            
+            🔄 **Version Update**: \`${mainVersion}\` → \`${prVersion}\`
+            
+            ✅ **Validation Status**: Version bump is valid and follows semantic versioning
+            
+            ### What happens after merge:
+            - ⏭️ Auto-bump will be **skipped** (manual version detected)
+            - 🏷️ Git tag \`v${prVersion}\` will be created
+            - 📋 GitHub release will be generated automatically
+            - 📦 Package will be published to NPM registry
+            
+            > 💡 Make sure your changes are properly documented and tested before merging!`;
+            } else {
+              const semver = require('semver');
+              const nextPatch = semver.inc(mainVersion, 'patch');
+              
+              body = `## 📦 No Version Change Detected
+            
+            📋 **Current Version**: \`${mainVersion}\`
+            
+            ### What happens after merge:
+            - 🔄 Version will be auto-bumped to \`${nextPatch}\` (patch increment)
+            - 🏷️ Git tag \`v${nextPatch}\` will be created  
+            - 📋 GitHub release will be generated automatically
+            - 📦 Package will be published to NPM registry
+            
+            > 💡 This is the normal flow for regular updates and bug fixes!`;
+            }
+            
+            // Post comment
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+      
+      - name: Validation Summary
+        run: |
+          echo "🎉 PR version validation completed successfully!"
+          echo "✅ All checks passed"
+          echo "📋 PR is ready for review and merge"
