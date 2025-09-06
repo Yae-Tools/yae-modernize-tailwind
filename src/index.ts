@@ -97,6 +97,7 @@ async function run() {
   }
 
   const git = simpleGit();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let gitStatus: any = undefined;
 
   try {
