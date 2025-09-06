@@ -3,10 +3,10 @@ name: PR Version Validation
 on:
   pull_request:
     branches: [main]
-    paths: ['package.json']
+    types: [opened, synchronize, reopened]
 
 permissions:
-  contents: read
+  contents: write
   issues: write
   pull-requests: write
 
@@ -23,12 +23,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install semver for validation
         run: npm install --no-save semver
 
       - name: Validate Version Bump
+        id: validate-version
         run: |
           # Get version from PR branch
           PR_VERSION=$(node -p "require('./package.json').version")
@@ -99,10 +100,29 @@ jobs:
             
           else
             echo "ℹ️  No manual version change detected"
-            echo "📋 This is normal - auto-bump will occur after merge to main"
+            echo "📋 Will auto-bump patch version in this PR"
             echo "   • Patch version will be incremented automatically"
             echo "   • Example: $MAIN_VERSION → $(echo $MAIN_VERSION | awk -F. '{print $1"."$2"."($3+1)}')"
+            echo "auto-bump-needed=true" >> $GITHUB_OUTPUT
           fi
+
+      - name: Auto Bump Version in PR
+        if: steps.validate-version.outputs.auto-bump-needed == 'true'
+        run: |
+          # Configure git
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          # Bump patch version
+          npm version patch --no-git-tag-version
+          NEW_VERSION=$(node -p "require('./package.json').version")
+
+          # Commit and push the version bump to the PR branch
+          git add package.json package-lock.json
+          git commit -m "chore: auto-bump version to $NEW_VERSION"
+          git push
+
+          echo "🚀 Auto-bumped version to $NEW_VERSION in PR"
 
       - name: Comment on PR
         uses: actions/github-script@v7
@@ -129,7 +149,6 @@ jobs:
             ✅ **Validation Status**: Version bump is valid and follows semantic versioning
 
             ### What happens after merge:
-            - ⏭️ Auto-bump will be **skipped** (manual version detected)
             - 🏷️ Git tag \`v${prVersion}\` will be created
             - 📋 GitHub release will be generated automatically
             - 📦 Package will be published to NPM registry
@@ -139,17 +158,17 @@ jobs:
               const semver = require('semver');
               const nextPatch = semver.inc(mainVersion, 'patch');
               
-              body = `## 📦 No Version Change Detected
+              body = `## 📦 Auto Version Bump Applied
 
-            📋 **Current Version**: \`${mainVersion}\`
+            📋 **Previous Version**: \`${mainVersion}\`
+            🚀 **New Version**: \`${nextPatch}\` (auto-bumped)
 
             ### What happens after merge:
-            - 🔄 Version will be auto-bumped to \`${nextPatch}\` (patch increment)
             - 🏷️ Git tag \`v${nextPatch}\` will be created  
             - 📋 GitHub release will be generated automatically
             - 📦 Package will be published to NPM registry
 
-            > 💡 This is the normal flow for regular updates and bug fixes!`;
+            > 💡 Version was automatically incremented since no manual bump was detected in this PR!`;
             }
 
             // Post comment with error handling

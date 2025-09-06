@@ -3,9 +3,6 @@ name: Version Bump and Release
 on:
   push:
     branches: [main]
-  pull_request:
-    types: [closed]
-    branches: [main]
 
 permissions:
   contents: write
@@ -15,7 +12,6 @@ permissions:
 
 jobs:
   version-and-release:
-    if: github.event.pull_request.merged == true || github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:
@@ -28,67 +24,23 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install Dependencies
         run: npm ci
 
-      - name: Detect Version Changes
-        id: version-check
-        run: |
-          # Get current version
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-
-          # Get version from previous commit (if exists)
-          if git rev-parse HEAD~1 >/dev/null 2>&1; then
-            git show HEAD~1:package.json > prev_package.json 2>/dev/null || echo '{"version":"0.0.0"}' > prev_package.json
-            PREVIOUS_VERSION=$(node -p "require('./prev_package.json').version")
-            rm -f prev_package.json
-          else
-            PREVIOUS_VERSION="0.0.0"
-          fi
-
-          echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          echo "previous-version=$PREVIOUS_VERSION" >> $GITHUB_OUTPUT
-
-          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
-            echo "version-changed=true" >> $GITHUB_OUTPUT
-            echo "✅ Manual version change detected: $PREVIOUS_VERSION → $CURRENT_VERSION"
-          else
-            echo "version-changed=false" >> $GITHUB_OUTPUT
-            echo "ℹ️  No version change detected. Will auto-bump patch version."
-          fi
-
-      - name: Auto Bump Version
-        if: steps.version-check.outputs.version-changed == 'false'
-        run: |
-          # Configure git
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-
-          # Bump patch version
-          npm version patch --no-git-tag-version
-          NEW_VERSION=$(node -p "require('./package.json').version")
-
-          # Commit the version bump
-          git add package.json package-lock.json
-          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
-          git push
-
-          echo "🚀 Auto-bumped version to $NEW_VERSION"
-
-      - name: Get Final Version
-        id: final-version
+      - name: Get Current Version
+        id: version
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Final version: $VERSION"
+          echo "Current version: $VERSION"
 
       - name: Check if Release Exists
         id: release-check
         run: |
-          TAG="v${{ steps.final-version.outputs.version }}"
+          TAG="v${{ steps.version.outputs.version }}"
 
           # Check if tag already exists
           if git rev-parse "$TAG" >/dev/null 2>&1; then
@@ -150,7 +102,7 @@ jobs:
       - name: Create Git Tag
         if: steps.release-check.outputs.tag-exists == 'false'
         run: |
-          TAG="v${{ steps.final-version.outputs.version }}"
+          TAG="v${{ steps.version.outputs.version }}"
           git tag "$TAG"
           git push origin "$TAG"
           echo "🏷️  Created and pushed tag: $TAG"
@@ -159,7 +111,7 @@ jobs:
         if: steps.release-check.outputs.tag-exists == 'false'
         id: release-notes
         run: |
-          VERSION="${{ steps.final-version.outputs.version }}"
+          VERSION="${{ steps.version.outputs.version }}"
 
           # Get the last tag (if any)
           LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
@@ -230,8 +182,8 @@ jobs:
         if: steps.release-check.outputs.tag-exists == 'false'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: 'v${{ steps.final-version.outputs.version }}'
-          name: 'Release v${{ steps.final-version.outputs.version }}'
+          tag_name: 'v${{ steps.version.outputs.version }}'
+          name: 'Release v${{ steps.version.outputs.version }}'
           body_path: ${{ steps.release-notes.outputs.notes-file }}
           draft: false
           prerelease: false
@@ -253,13 +205,13 @@ jobs:
           # Publish to NPM
           npm publish --access public
 
-          echo "🎉 Successfully published v${{ steps.final-version.outputs.version }} to NPM!"
+          echo "🎉 Successfully published v${{ steps.version.outputs.version }} to NPM!"
 
       - name: Success Notification
         if: success() && steps.release-check.outputs.tag-exists == 'false'
         run: |
           echo "🎉 Release workflow completed successfully!"
-          echo "✅ Version: v${{ steps.final-version.outputs.version }}"
+          echo "✅ Version: v${{ steps.version.outputs.version }}"
           echo "✅ GitHub Release: Created"
           echo "✅ NPM Package: Published"
 
@@ -274,7 +226,7 @@ jobs:
 
             The release workflow encountered an error. Please check the [workflow logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.
 
-            **Attempted Version**: v${{ steps.final-version.outputs.version || 'unknown' }}
+            **Attempted Version**: v${{ steps.version.outputs.version || 'unknown' }}
             **Workflow Run**: ${{ github.run_id }}
             **Commit**: ${{ github.sha }}`;
 
