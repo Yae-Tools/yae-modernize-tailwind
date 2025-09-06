@@ -114,6 +114,7 @@ _site/
 .vscode/
 *.sublime-project
 *.sublime-workspace
+.qoder
 
 # Build output
 dist/

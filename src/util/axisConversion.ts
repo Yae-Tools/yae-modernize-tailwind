@@ -1,52 +1,78 @@
-import { ConversionResult } from "../types/conversionTypes.js";
-import parseClassName from "./parseClassName.js";
+import { ConversionResult } from '../types/conversionTypes.js';
+import parseClassName from './parseClassName.js';
+import { extractAllClassMatches, applyClassReplacements } from './patternRegistry.js';
+import { ClassUtils } from './safeArrayOperations.js';
+import { ErrorHandler } from './errorHandler.js';
 
-const createAxisConversion = (prefix: string) => (content: string): ConversionResult => {
-    let changed = false;
-    const newContent = content.replace(/class="([^"]*)"/g, (match, classString: string) => {
-        const originalClasses = classString.split(' ').filter(c => c.length > 0);
-        let newClassList = [...originalClasses];
-        let modifiedInThisAttribute = false;
+const createAxisConversion =
+  (prefix: string) =>
+  (content: string, filePath = 'unknown'): ConversionResult => {
+    try {
+      let changed = false;
+      const classMatches = extractAllClassMatches(content, filePath);
+      const replacements: { original: (typeof classMatches)[0]; newClasses: string[] }[] = [];
 
-        const parsedClasses = originalClasses.map(parseClassName);
+      for (const match of classMatches) {
+        const processor = ClassUtils.createProcessor(match.classes);
+        const originalClasses = match.classes.split(' ').filter((c) => c.length > 0);
+        const parsedClasses = originalClasses.map((cls, index) => ({
+          ...parseClassName(cls),
+          index,
+        }));
 
-        const groupedByVariant: Record<string, { variants: string, className: string, original: string }[]> = parsedClasses.reduce((acc: Record<string, { variants: string, className: string, original: string }[]>, parsed) => {
-            acc[parsed.variants] = acc[parsed.variants] || [];
-            acc[parsed.variants].push(parsed);
-            return acc;
-        }, {});
+        const groupedByVariant = ClassUtils.groupByVariant(parsedClasses);
+        let matchModified = false;
 
         for (const variant in groupedByVariant) {
-            const variantGroup = groupedByVariant[variant];
+          const variantGroup = groupedByVariant[variant];
 
-            const xClassInfo = variantGroup.find(p => p.className.startsWith(`${prefix}x-`));
-            const yClassInfo = variantGroup.find(p => p.className.startsWith(`${prefix}y-`));
+          const xClasses = ClassUtils.findClassesWithPrefix(variantGroup, `${prefix}x`);
+          const yClasses = ClassUtils.findClassesWithPrefix(variantGroup, `${prefix}y`);
 
-            if (xClassInfo && yClassInfo) {
-                const xValue = xClassInfo.className.split('-')[1];
-                const yValue = yClassInfo.className.split('-')[1];
+          // Find matching x- and y- classes with same values
+          for (const xClass of xClasses) {
+            for (const yClass of yClasses) {
+              if (ClassUtils.haveSameValue(xClass.className, yClass.className)) {
+                const value = ClassUtils.extractValue(xClass.className);
+                if (value) {
+                  const newClass = `${variant}${prefix}-${value}`;
 
-                if (xValue === yValue) {
-                    const newClass = `${variant}${prefix}-${xValue}`;
-                    const index1 = newClassList.indexOf(xClassInfo.original);
-                    if (index1 > -1) newClassList.splice(index1, 1);
-                    const index2 = newClassList.indexOf(yClassInfo.original);
-                    if (index2 > -1) newClassList.splice(index2, 1);
-                    newClassList.push(newClass);
-                    modifiedInThisAttribute = true;
+                  // Use safe operations to replace the pair
+                  if (
+                    ClassUtils.replacePair(processor, xClass.original, yClass.original, newClass)
+                  ) {
+                    matchModified = true;
+                  }
                 }
+              }
             }
+          }
         }
 
-        if (modifiedInThisAttribute) {
+        if (matchModified) {
+          const result = processor.execute();
+          if (result.changed) {
+            replacements.push({ original: match, newClasses: result.newClasses });
             changed = true;
-            return `class="${newClassList.join(' ')}"`;
+          }
         }
+      }
 
-        return match;
-    });
+      const newContent =
+        replacements.length > 0 ? applyClassReplacements(content, replacements) : content;
 
-    return { newContent, changed };
-}
+      return { newContent, changed };
+    } catch (error) {
+      const conversionError = ErrorHandler.handleContentError(error, filePath);
+      ErrorHandler.recordError(conversionError);
+
+      if (!ErrorHandler.shouldContinueProcessing(conversionError)) {
+        throw conversionError;
+      }
+
+      // Return original content on error
+      return { newContent: content, changed: false };
+    }
+  };
 
 export default createAxisConversion;
