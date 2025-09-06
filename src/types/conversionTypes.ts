@@ -51,3 +51,72 @@ export interface ClassInfo {
   original: string;
   index: number;
 }
+
+// Error Logging Interfaces
+export interface SystemInfo {
+  nodeVersion: string;
+  platform: string;
+  arch: string;
+  totalMemory: number;
+  freeMemory: number;
+  cwd: string;
+}
+
+export interface GitStatus {
+  isRepo: boolean;
+  hasChanges: boolean;
+  currentBranch?: string;
+  lastCommit?: string;
+}
+
+export interface ErrorReportContext {
+  sessionStartTime: Date;
+  totalFiles: number;
+  processedFiles: number;
+  currentFile?: string;
+  gitStatus?: GitStatus;
+  cliArguments: string[];
+}
+
+export interface ErrorReport {
+  sessionId: string;
+  timestamp: Date;
+  error: ConversionError;
+  systemInfo: SystemInfo;
+  context: ErrorReportContext;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface LoggingConfig {
+  enabled: boolean;
+  logLevel: 'error' | 'warn' | 'info' | 'debug';
+  maxLogFiles: number;
+  maxLogSizeBytes: number;
+  logDirectory: string;
+  enableMemoryBuffer: boolean;
+  bufferSize: number;
+}
+
+export interface SessionSummary {
+  sessionId: string;
+  startTime: Date;
+  endTime: Date;
+  duration: number;
+  filesProcessed: number;
+  totalErrors: number;
+  errorsByType: Record<string, number>;
+  errorsByFile: Record<string, number>;
+  systemPerformance: {
+    peakMemoryUsage: number;
+    averageProcessingTime: number;
+  };
+  recommendations: string[];
+}
+
+export interface ConversionError {
+  name: string;
+  message: string;
+  context: ErrorContext;
+  recoverable: boolean;
+  stack?: string;
+}

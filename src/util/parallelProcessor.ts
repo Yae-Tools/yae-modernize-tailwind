@@ -203,7 +203,7 @@ class FileWorker {
       const conversionFunction = conversionFunctions[conversion];
       if (!conversionFunction) continue;
 
-      const result = ErrorHandler.safeContentOperation(
+      const result = await ErrorHandler.safeContentOperation(
         () => conversionFunction(currentContent, filePath),
         filePath,
       );
@@ -252,9 +252,6 @@ export class ParallelProcessor {
       memoryThreshold = Math.round(maxMemoryLimit * 0.8), // 80% of available memory
       progressCallback,
     } = options;
-
-    // Initialize error tracking
-    ErrorHandler.initSession(files.length);
 
     // Set up progress tracking
     const progressAggregator = new ProgressAggregator(files.length, progressCallback);
@@ -336,8 +333,6 @@ export class ParallelProcessor {
     progressCallback?: (processed: number, total: number, currentFile: string) => void,
   ): Promise<ProcessingResult[]> {
     const results: ProcessingResult[] = [];
-
-    ErrorHandler.initSession(files.length);
 
     for (let i = 0; i < files.length; i++) {
       const filePath = files[i];

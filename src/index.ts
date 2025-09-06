@@ -97,8 +97,17 @@ async function run() {
   }
 
   const git = simpleGit();
+  let gitStatus: any = undefined;
+
   try {
     const status = await git.status();
+    gitStatus = {
+      isRepo: true,
+      hasChanges: !status.isClean(),
+      currentBranch: status.current,
+      lastCommit: undefined, // Could be enhanced to get last commit
+    };
+
     if (!status.isClean() && !ignoreGit) {
       console.error(
         chalk.red(
@@ -108,6 +117,10 @@ async function run() {
       exitMessage();
     }
   } catch {
+    gitStatus = {
+      isRepo: false,
+      hasChanges: false,
+    };
     console.warn(
       chalk.yellow('Warning: Not a Git repository or Git not installed. Skipping Git clean check.'),
     );
@@ -159,6 +172,8 @@ async function run() {
   const spinner = ora(chalk.cyan('Initializing processing...')).start();
 
   try {
+    // Initialize error handler with git status
+    await ErrorHandler.initSession(files.length, gitStatus);
     // Set up progress callback
     const progressCallback = (processed: number, total: number, currentFile: string) => {
       const percentage = ((processed / total) * 100).toFixed(1);
@@ -207,7 +222,7 @@ async function run() {
     }
 
     // Display detailed error report
-    const errorReport = ErrorHandler.generateReport();
+    const errorReport = await ErrorHandler.generateReport();
     console.log(errorReport);
   } catch (error) {
     spinner.fail(chalk.red('Processing failed with fatal error'));
