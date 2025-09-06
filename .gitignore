@@ -116,5 +116,7 @@ _site/
 *.sublime-workspace
 .qoder
 
+demo
+
 # Build output
 dist/
