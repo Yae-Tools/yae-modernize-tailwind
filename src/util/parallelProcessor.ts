@@ -1,6 +1,6 @@
 import { ConversionResult, ProcessingResult } from '../types/conversionTypes.js';
 import { ErrorHandler } from './errorHandler.js';
-import { cpus } from 'os';
+import { cpus, totalmem, freemem } from 'os';
 import { promises as fs } from 'fs';
 
 /**
@@ -14,6 +14,7 @@ export interface ProcessingOptions {
   maxWorkers?: number;
   chunkSize?: number;
   memoryThreshold?: number; // MB
+  maxMemoryUsage?: number; // MB - maximum memory to use (default: auto-detect)
   progressCallback?: (processed: number, total: number, currentFile: string) => void;
 }
 
@@ -32,7 +33,7 @@ export interface WorkerResult {
 }
 
 /**
- * Memory usage monitor
+ * Memory usage monitor with dynamic system memory detection
  */
 class MemoryMonitor {
   private static readonly MB = 1024 * 1024;
@@ -40,6 +41,29 @@ class MemoryMonitor {
   static getCurrentUsage(): number {
     const usage = process.memoryUsage();
     return Math.round(usage.heapUsed / this.MB);
+  }
+
+  static getSystemMemory(): { total: number; free: number; available: number } {
+    const totalMemory = Math.round(totalmem() / this.MB);
+    const freeMemory = Math.round(freemem() / this.MB);
+
+    // Conservative estimate: use 70% of free memory or 50% of total memory, whichever is smaller
+    const conservativeUsage = Math.min(Math.round(freeMemory * 0.7), Math.round(totalMemory * 0.5));
+
+    return {
+      total: totalMemory,
+      free: freeMemory,
+      available: Math.max(256, conservativeUsage), // Minimum 256MB
+    };
+  }
+
+  static calculateOptimalMemoryLimit(maxMemoryUsage?: number): number {
+    if (maxMemoryUsage && maxMemoryUsage > 0) {
+      return maxMemoryUsage;
+    }
+
+    const systemMemory = this.getSystemMemory();
+    return systemMemory.available;
   }
 
   static shouldPauseProcessing(threshold: number): boolean {
@@ -55,7 +79,6 @@ class MemoryMonitor {
         global.gc();
       }
 
-      // Wait a bit before checking again
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
@@ -80,10 +103,9 @@ class ChunkDistributor {
     const minChunksPerWorker = 3;
     const targetChunks = maxWorkers * minChunksPerWorker;
 
-    // But don't make chunks too small (minimum 1 file per chunk)
     const chunkSize = Math.max(1, Math.ceil(totalFiles / targetChunks));
 
-    // Also don't make chunks too large (maximum 10 files per chunk for responsiveness)
+    // (maximum 10 files per chunk for responsiveness)
     return Math.min(chunkSize, 10);
   }
 }
@@ -222,10 +244,12 @@ export class ParallelProcessor {
     conversionFunctions: Record<string, (content: string, filePath?: string) => ConversionResult>,
     options: ProcessingOptions = {},
   ): Promise<ProcessingResult[]> {
+    const maxMemoryLimit = MemoryMonitor.calculateOptimalMemoryLimit(options.maxMemoryUsage);
+
     const {
       maxWorkers = this.getOptimalWorkerCount(),
       chunkSize = ChunkDistributor.calculateOptimalChunkSize(files.length, maxWorkers),
-      memoryThreshold = 512, // 512MB
+      memoryThreshold = Math.round(maxMemoryLimit * 0.8), // 80% of available memory
       progressCallback,
     } = options;
 
@@ -356,17 +380,21 @@ export class ParallelProcessor {
     conversions: string[],
     conversionFunctions: Record<string, (content: string, filePath?: string) => ConversionResult>,
     progressCallback?: (processed: number, total: number, currentFile: string) => void,
+    maxMemoryUsage?: number,
   ): Promise<ProcessingResult[]> {
+    const maxMemoryLimit = MemoryMonitor.calculateOptimalMemoryLimit(maxMemoryUsage);
     const memoryUsage = MemoryMonitor.getCurrentUsage();
-    const availableMemory = 1024 - memoryUsage; // Assume 1GB available, adjust as needed
+    const availableMemory = maxMemoryLimit - memoryUsage;
 
     // Use parallel processing for larger file sets if we have enough memory
+    // Require at least 256MB available memory for parallel processing
     const shouldUseParallel = files.length > 5 && availableMemory > 256;
 
     if (shouldUseParallel) {
       return this.processFiles(files, conversions, conversionFunctions, {
         progressCallback,
-        memoryThreshold: Math.min(512, availableMemory * 0.8),
+        maxMemoryUsage,
+        memoryThreshold: Math.round(availableMemory * 0.8),
       });
     } else {
       return this.processFilesSequential(files, conversions, conversionFunctions, progressCallback);

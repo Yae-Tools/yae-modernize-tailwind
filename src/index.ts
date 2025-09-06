@@ -29,6 +29,11 @@ const argv = yargs(hideBin(process.argv))
     default: false,
     description: 'Ignore Git clean check',
   })
+  .option('max-memory', {
+    alias: 'm',
+    type: 'number',
+    description: 'Maximum memory usage in MB (default: auto-detect based on system memory)',
+  })
   .help().argv;
 
 async function run() {
@@ -53,8 +58,16 @@ async function run() {
 
   console.log(chalk.cyan(logo));
 
-  let { conversions, path, ignoreGit, 'ignore-git': ignoreGitKebab } = await argv;
+  let {
+    conversions,
+    path,
+    ignoreGit,
+    'ignore-git': ignoreGitKebab,
+    maxMemory,
+    'max-memory': maxMemoryKebab,
+  } = await argv;
   ignoreGit = typeof ignoreGit !== 'undefined' ? ignoreGit : ignoreGitKebab;
+  maxMemory = typeof maxMemory !== 'undefined' ? maxMemory : maxMemoryKebab;
 
   const currentDir = process.cwd();
   const detectedEnv = await detectEnvironment(currentDir);
@@ -94,7 +107,7 @@ async function run() {
       );
       exitMessage();
     }
-  } catch (error) {
+  } catch {
     console.warn(
       chalk.yellow('Warning: Not a Git repository or Git not installed. Skipping Git clean check.'),
     );
@@ -166,6 +179,7 @@ async function run() {
       conversions,
       enhancedConversions,
       progressCallback,
+      maxMemory,
     );
 
     spinner.stop();

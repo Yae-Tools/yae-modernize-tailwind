@@ -91,8 +91,11 @@ const reconstructSvelte = (classes: string[], original: string): string => {
 /**
  * Reconstruct template literal
  */
-const reconstructTemplate = (classes: string[], _original: string): string => {
-  return `\`class="${classes.join(' ')}"\``;
+const reconstructTemplate = (classes: string[], original: string): string => {
+  // Extract the quote style from the original template literal
+  const quoteMatch = original.match(/class\s*=\s*(["'])/);
+  const quote = quoteMatch ? quoteMatch[1] : '"'; // Default to double quotes if not found
+  return `\`class=${quote}${classes.join(' ')}${quote}\``;
 };
 
 /**

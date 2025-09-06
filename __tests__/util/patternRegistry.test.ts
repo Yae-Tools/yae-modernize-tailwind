@@ -111,6 +111,38 @@ describe('PatternRegistry', () => {
       expect(hasExpectedClasses).toBe(true);
     });
 
+    it('should preserve quote style in template literal reconstruction', () => {
+      // Test double quotes preservation
+      const doubleQuoteContent = '`<div class="w-4 h-4">Template</div>`';
+      const doubleQuoteMatches = extractAllClassMatches(doubleQuoteContent, 'test.js');
+      
+      expect(doubleQuoteMatches).toHaveLength(1);
+      expect(doubleQuoteMatches[0].classes).toBe('w-4 h-4');
+      
+      const doubleQuoteReplacements = [{
+        original: doubleQuoteMatches[0],
+        newClasses: ['size-4']
+      }];
+      
+      const doubleQuoteResult = applyClassReplacements(doubleQuoteContent, doubleQuoteReplacements);
+      expect(doubleQuoteResult).toBe('`<div class="size-4">Template</div>`');
+      
+      // Test single quotes preservation
+      const singleQuoteContent = "`<div class='w-4 h-4'>Template</div>`";
+      const singleQuoteMatches = extractAllClassMatches(singleQuoteContent, 'test.js');
+      
+      expect(singleQuoteMatches).toHaveLength(1);
+      expect(singleQuoteMatches[0].classes).toBe('w-4 h-4');
+      
+      const singleQuoteReplacements = [{
+        original: singleQuoteMatches[0],
+        newClasses: ['size-4']
+      }];
+      
+      const singleQuoteResult = applyClassReplacements(singleQuoteContent, singleQuoteReplacements);
+      expect(singleQuoteResult).toBe("`<div class='size-4'>Template</div>`");
+    });
+
     it('should handle special characters in class names', () => {
       const content = '<div class="w-4 h-4 text-red-500/75 hover:scale-110">Content</div>';
       const matches = extractAllClassMatches(content, 'test.html');
