@@ -19,13 +19,15 @@ async function checkFileExists(filePath: string): Promise<boolean> {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function readPackageJson(projectRoot: string): Promise<any | null> {
   const packageJsonPath = path.join(projectRoot, 'package.json');
   if (await checkFileExists(packageJsonPath)) {
     const content = await fs.readFile(packageJsonPath, 'utf-8');
     try {
       return JSON.parse(content);
-    } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error) {
       return null;
     }
   }
