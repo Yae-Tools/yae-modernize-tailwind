@@ -13,6 +13,7 @@ permissions:
 jobs:
   validate-version:
     runs-on: ubuntu-latest
+    if: github.head_ref == 'develop'
 
     steps:
       - name: Checkout Code
