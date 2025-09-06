@@ -1,62 +1,94 @@
-import { ConversionResult } from "../types/conversionTypes.js";
-import parseClassName from "./parseClassName.js";
+import { ConversionResult } from '../types/conversionTypes.js';
+import parseClassName from './parseClassName.js';
+import { extractAllClassMatches, applyClassReplacements } from './patternRegistry.js';
+import { ClassUtils } from './safeArrayOperations.js';
+import { ErrorHandler } from './errorHandler.js';
 
-const gapConversion = (content: string): ConversionResult => {
+const gapConversion = (content: string, filePath = 'unknown'): ConversionResult => {
+  try {
     let changed = false;
-    const newContent = content.replace(/class="([^"]*)"/g, (match, classString: string) => {
-        const originalClasses = classString.split(' ').filter(c => c.length > 0);
-        let newClassList = [...originalClasses];
-        let modifiedInThisAttribute = false;
+    const classMatches = extractAllClassMatches(content, filePath);
+    const replacements: { original: (typeof classMatches)[0]; newClasses: string[] }[] = [];
 
-        const parsedClasses = originalClasses.map(parseClassName);
+    for (const match of classMatches) {
+      const originalClasses = match.classes.split(' ').filter((c) => c.length > 0);
+      const parsedClasses = originalClasses.map((cls, index) => ({
+        ...parseClassName(cls),
+        index,
+      }));
 
-        // Check if there's any flex or grid class in the entire set of classes
-        const overallHasFlexOrGrid = parsedClasses.some(p =>
-            p.className === 'flex' || p.className === 'grid' ||
-            p.className.startsWith('flex-') || p.className.startsWith('grid-')
-        );
+      // Check if there's any flex or grid class in the entire set of classes
+      const overallHasFlexOrGrid = parsedClasses.some(
+        (p) =>
+          p.className === 'flex' ||
+          p.className === 'grid' ||
+          p.className.startsWith('flex-') ||
+          p.className.startsWith('grid-'),
+      );
 
-        if (!overallHasFlexOrGrid) {
-            return match; // No flex or grid, so no gap conversion needed
-        }
+      if (!overallHasFlexOrGrid) {
+        continue; // No flex or grid, so no gap conversion needed
+      }
 
-        const groupedByVariant: Record<string, { variants: string, className: string, original: string }[]> = parsedClasses.reduce((acc: Record<string, { variants: string, className: string, original: string }[]>, parsed) => {
-            acc[parsed.variants] = acc[parsed.variants] || [];
-            acc[parsed.variants].push(parsed);
-            return acc;
-        }, {});
+      const processor = ClassUtils.createProcessor(match.classes);
+      const groupedByVariant = ClassUtils.groupByVariant(parsedClasses);
+      let matchModified = false;
 
-        for (const variant in groupedByVariant) {
-            const variantGroup = groupedByVariant[variant];
+      for (const variant in groupedByVariant) {
+        const variantGroup = groupedByVariant[variant];
 
-            const spaceXClassInfo = variantGroup.find(p => p.className.startsWith('space-x-'));
-            const spaceYClassInfo = variantGroup.find(p => p.className.startsWith('space-y-'));
+        const spaceXClasses = ClassUtils.findClassesWithPrefix(variantGroup, 'space-x');
+        const spaceYClasses = ClassUtils.findClassesWithPrefix(variantGroup, 'space-y');
 
-            if (spaceXClassInfo && spaceYClassInfo) {
-                const spaceXValue = spaceXClassInfo.className.split('-').pop();
-                const spaceYValue = spaceYClassInfo.className.split('-').pop();
+        // Find matching space-x- and space-y- classes with same values
+        for (const spaceXClass of spaceXClasses) {
+          for (const spaceYClass of spaceYClasses) {
+            if (ClassUtils.haveSameValue(spaceXClass.className, spaceYClass.className)) {
+              const value = ClassUtils.extractValue(spaceXClass.className);
+              if (value) {
+                const newClass = `${variant}gap-${value}`;
 
-                if (spaceXValue === spaceYValue) {
-                    const newClass = `${variant}gap-${spaceXValue}`;
-                    const index1 = newClassList.indexOf(spaceXClassInfo.original);
-                    if (index1 > -1) newClassList.splice(index1, 1);
-                    const index2 = newClassList.indexOf(spaceYClassInfo.original);
-                    if (index2 > -1) newClassList.splice(index2, 1);
-                    newClassList.push(newClass);
-                    modifiedInThisAttribute = true;
+                // Use safe operations to replace the pair
+                if (
+                  ClassUtils.replacePair(
+                    processor,
+                    spaceXClass.original,
+                    spaceYClass.original,
+                    newClass,
+                  )
+                ) {
+                  matchModified = true;
                 }
+              }
             }
+          }
         }
+      }
 
-        if (modifiedInThisAttribute) {
-            changed = true;
-            return `class="${newClassList.join(' ')}"`;
+      if (matchModified) {
+        const result = processor.execute();
+        if (result.changed) {
+          replacements.push({ original: match, newClasses: result.newClasses });
+          changed = true;
         }
+      }
+    }
 
-        return match;
-    });
+    const newContent =
+      replacements.length > 0 ? applyClassReplacements(content, replacements) : content;
 
     return { newContent, changed };
+  } catch (error) {
+    const conversionError = ErrorHandler.handleContentError(error, filePath);
+    ErrorHandler.recordError(conversionError);
+
+    if (!ErrorHandler.shouldContinueProcessing(conversionError)) {
+      throw conversionError;
+    }
+
+    // Return original content on error
+    return { newContent: content, changed: false };
+  }
 };
 
 export default gapConversion;

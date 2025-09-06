@@ -1,12 +1,13 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { promises as fs } from 'fs';
 import { glob } from 'glob';
 import inquirer from 'inquirer';
 import { CONVERSIONS } from './conversions.js';
 import { simpleGit } from 'simple-git';
 import { detectEnvironment, getTailwindVersion, shouldShowTailwindWarning } from './environment.js';
 import { exitMessage } from './util/exitMessage.js';
+import { ParallelProcessor } from './util/parallelProcessor.js';
+import { ErrorHandler } from './util/errorHandler.js';
 import chalk from 'chalk';
 import ora from 'ora';
 
@@ -27,6 +28,11 @@ const argv = yargs(hideBin(process.argv))
     type: 'boolean',
     default: false,
     description: 'Ignore Git clean check',
+  })
+  .option('max-memory', {
+    alias: 'm',
+    type: 'number',
+    description: 'Maximum memory usage in MB (default: auto-detect based on system memory)',
   })
   .help().argv;
 
@@ -51,13 +57,21 @@ async function run() {
 `;
 
   console.log(chalk.cyan(logo));
-  
-  let { conversions, path, ignoreGit, 'ignore-git': ignoreGitKebab } = await argv;
+
+  let {
+    conversions,
+    path,
+    ignoreGit,
+    'ignore-git': ignoreGitKebab,
+    maxMemory,
+    'max-memory': maxMemoryKebab,
+  } = await argv;
   ignoreGit = typeof ignoreGit !== 'undefined' ? ignoreGit : ignoreGitKebab;
+  maxMemory = typeof maxMemory !== 'undefined' ? maxMemory : maxMemoryKebab;
 
   const currentDir = process.cwd();
   const detectedEnv = await detectEnvironment(currentDir);
-  
+
   // Check Tailwind CSS version and show warning if needed
   const tailwindVersion = await getTailwindVersion(currentDir);
   if (shouldShowTailwindWarning(tailwindVersion)) {
@@ -83,8 +97,17 @@ async function run() {
   }
 
   const git = simpleGit();
+  let gitStatus: any = undefined;
+
   try {
     const status = await git.status();
+    gitStatus = {
+      isRepo: true,
+      hasChanges: !status.isClean(),
+      currentBranch: status.current,
+      lastCommit: undefined, // Could be enhanced to get last commit
+    };
+
     if (!status.isClean() && !ignoreGit) {
       console.error(
         chalk.red(
@@ -93,7 +116,11 @@ async function run() {
       );
       exitMessage();
     }
-  } catch (error) {
+  } catch {
+    gitStatus = {
+      isRepo: false,
+      hasChanges: false,
+    };
     console.warn(
       chalk.yellow('Warning: Not a Git repository or Git not installed. Skipping Git clean check.'),
     );
@@ -134,39 +161,80 @@ async function run() {
 
   const files = await glob(path, { nodir: true, ignore: ['node_modules/**'] });
 
-  const spinner = ora(chalk.cyan('Processing files...')).start();
-  for (const file of files) {
-    try {
-      spinner.text = chalk.cyan(`Processing file: ${file}`);
-      let content = await fs.readFile(file, 'utf-8');
-      let changed = false;
-
-      for (const conversion of conversions) {
-        const conversionFunction = CONVERSIONS[conversion as keyof typeof CONVERSIONS];
-        const { newContent, changed: conversionChanged } = conversionFunction(content);
-        content = newContent;
-        if (conversionChanged) {
-          changed = true;
-        }
-      }
-
-      if (changed) {
-        await fs.writeFile(file, content, 'utf-8');
-        spinner.succeed(chalk.green(`Updated ${file}`));
-        if(files.indexOf(file) < files.length - 1) {
-          spinner.start(chalk.cyan('Processing next file...', file)); // Restart spinner for next file
-        }
-
-      }
-    } catch (error) {
-      console.error(error);
-      spinner.fail(chalk.red(`Failed to process ${file}`));
-      spinner.start(chalk.cyan('Processing next file...')); // Restart spinner for next file
-    }
+  if (files.length === 0) {
+    console.log(chalk.yellow('No files found matching the specified pattern.'));
+    exitMessage();
+    return;
   }
-  spinner.stop();
-  console.log('');
-  console.log(chalk.blue('All specified conversions have been applied.'));
+
+  console.log(chalk.blue(`Found ${files.length} files to process...`));
+
+  const spinner = ora(chalk.cyan('Initializing processing...')).start();
+
+  try {
+    // Initialize error handler with git status
+    await ErrorHandler.initSession(files.length, gitStatus);
+    // Set up progress callback
+    const progressCallback = (processed: number, total: number, currentFile: string) => {
+      const percentage = ((processed / total) * 100).toFixed(1);
+      spinner.text = chalk.cyan(`Processing [${percentage}%]: ${currentFile}`);
+    };
+
+    // Update conversion functions to accept filePath parameter
+    const enhancedConversions = Object.fromEntries(
+      Object.entries(CONVERSIONS).map(([key, fn]) => [
+        key,
+        (content: string, filePath?: string) => fn(content, filePath),
+      ]),
+    );
+
+    // Use auto-processing mode for optimal performance
+    const results = await ParallelProcessor.autoProcessFiles(
+      files,
+      conversions,
+      enhancedConversions,
+      progressCallback,
+      maxMemory,
+    );
+
+    spinner.stop();
+
+    // Process results
+    const successCount = results.filter((r) => r.success).length;
+    const changeCount = results.reduce((sum, r) => sum + (r.changes || 0), 0);
+    const errorCount = results.filter((r) => !r.success).length;
+
+    console.log('');
+    if (errorCount === 0) {
+      console.log(chalk.green(`✅ Successfully processed ${successCount} files`));
+      if (changeCount > 0) {
+        console.log(chalk.blue(`🔧 Applied changes to ${changeCount} files`));
+      } else {
+        console.log(chalk.blue('📝 No changes were needed'));
+      }
+    } else {
+      console.log(
+        chalk.yellow(`⚠️  Processed ${successCount} files successfully, ${errorCount} failed`),
+      );
+      if (changeCount > 0) {
+        console.log(chalk.blue(`🔧 Applied changes to ${changeCount} files`));
+      }
+    }
+
+    // Display detailed error report
+    const errorReport = await ErrorHandler.generateReport();
+    console.log(errorReport);
+  } catch (error) {
+    spinner.fail(chalk.red('Processing failed with fatal error'));
+
+    if (error instanceof Error) {
+      console.error(chalk.red(`Error: ${error.message}`));
+    } else {
+      console.error(chalk.red('An unknown error occurred'));
+    }
+
+    process.exit(1);
+  }
   exitMessage();
   return;
 }

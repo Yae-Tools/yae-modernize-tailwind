@@ -89,8 +89,7 @@ describe('gapConversion', () => {
     expect(newContent).toContain('gap-4');
     expect(newContent).toContain('text-red-500');
     expect(newContent).toContain('grid');
-    expect(newContent).toContain('space-x-2'); // Should not be converted
-    expect(newContent).toContain('space-y-2'); // Should not be converted
+    expect(newContent).toContain('gap-2'); // Both pairs should be converted
     expect(changed).toBe(true);
   });
 
